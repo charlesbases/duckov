@@ -1,3 +1,4 @@
+using System.Reflection;
 using Duckov.UI;
 using ItemStatsSystem;
 
@@ -35,6 +36,11 @@ namespace BetterExperience
             }
             // 耐久度
             item.DurabilityLoss = 0;
+            
+            // 重量
+            item.GetType().
+                GetField("weight", BindingFlags.NonPublic | BindingFlags.Instance)?.
+                SetValue(item, 0);
         }
     }
 }
