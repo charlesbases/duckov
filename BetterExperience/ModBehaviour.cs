@@ -5,6 +5,7 @@ using Duckov.Quests.Tasks;
 using Duckov.UI;
 using ItemStatsSystem;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace BetterExperience
 {
@@ -28,7 +29,7 @@ namespace BetterExperience
             ItemHoveringUI.onSetupItem -= OnSetupItem;
             SceneLoader.onFinishedLoadingScene -= OnFinishedLoadingScene;
 
-            // 性能优化：清空静态缓存以释放内存
+            // 清空静态缓存以释放内存
             FieldCache.Clear();
             ModifiedPrefabIDs.Clear();
         }
@@ -37,19 +38,30 @@ namespace BetterExperience
         {
             if (item == null)
                 return;
-            
+                
+            // 修改物体数据
+            ModifyItem(item);
+        }
+
+        private static void ModifyItem(Item item)
+        {
             // 修改物体实例
             SetupItem(item);
 
-            // 仅修改预制体一次
-            if (!ModifiedPrefabIDs.Contains(item.TypeID))
-            {
-                SetupItem(ItemAssetsCollection.GetPrefab(item.TypeID));
-                ModifiedPrefabIDs.Add(item.TypeID);
-            }
+            // 修改预制体
+            if (ModifiedPrefabIDs.Contains(item.TypeID)) return;
+            SetupItem(ItemAssetsCollection.GetPrefab(item.TypeID));
+            ModifiedPrefabIDs.Add(item.TypeID);
         }
 
         private static void OnFinishedLoadingScene(SceneLoadingContext obj)
+        {
+            // 修改击杀任务要求
+            ModifyQuests();
+            
+        }
+
+        private static void ModifyQuests()
         {
             foreach (var activeQuest in QuestManager.Instance.ActiveQuests)
             {
@@ -76,21 +88,18 @@ namespace BetterExperience
 
         private static void SetQuest(Quest quest)
         {
-            foreach (var task in quest.Tasks)
+            foreach (var task in quest.Tasks.OfType<QuestTask_KillCount>())
             {
-                if (task is QuestTask_KillCount)
-                {
-                    SetValue(task,"requireBuff",false);
-                    SetValue(task,"withWeapon", false);
-                    SetValue(task,"requireHeadShot", false);
-                    SetValue(task,"withoutHeadShot", false);
-                    SetValue(task,"requireSceneID", "");
-                }
+                SetValue(task,"requireBuff",false);
+                SetValue(task,"withWeapon", false);
+                SetValue(task,"requireHeadShot", false);
+                SetValue(task,"withoutHeadShot", false);
+                SetValue(task,"requireSceneID", "");
             }
         }
 
         // 3. 优化后的 SetValue
-        private static void SetValue(Object obj, string field, Object value)
+        private static void SetValue(object obj, string field, object value)
         {
             if (obj == null) return;
 
