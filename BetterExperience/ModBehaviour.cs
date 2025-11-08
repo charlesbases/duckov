@@ -11,111 +11,148 @@ namespace BetterExperience
 {
     public class ModBehaviour : Duckov.Modding.ModBehaviour
     {
-        // FieldInfo 缓存
-        private static readonly Dictionary<Tuple<Type, string>, FieldInfo> FieldCache = 
-            new Dictionary<Tuple<Type, string>, FieldInfo>();
-
-        // 已修改预制体 ID 缓存
-        private static readonly HashSet<int> ModifiedPrefabIDs = new HashSet<int>();
+        private readonly ItemModifier _itemModifier = new ItemModifier();
+        private readonly QuestModifier _questModifier = new QuestModifier();
 
         void OnEnable()
         {
             ItemHoveringUI.onSetupItem += OnSetupItem;
+            ItemHoveringUI.onSetupMeta += OnSetupMeta;
             SceneLoader.onFinishedLoadingScene += OnFinishedLoadingScene;
         }
 
         void OnDisable()
         {
             ItemHoveringUI.onSetupItem -= OnSetupItem;
+            ItemHoveringUI.onSetupMeta -= OnSetupMeta;
             SceneLoader.onFinishedLoadingScene -= OnFinishedLoadingScene;
 
-            // 清空静态缓存以释放内存
-            FieldCache.Clear();
-            ModifiedPrefabIDs.Clear();
+            Clear();
         }
 
-        private static void OnSetupItem(ItemHoveringUI _, Item item)
+        private void Clear()
         {
-            if (item == null)
-                return;
-                
-            // 修改物体数据
-            ModifyItem(item);
+            _itemModifier.ClearCache();
+            _questModifier.ClearCache();
         }
 
-        private static void ModifyItem(Item item)
+        private void OnSetupItem(ItemHoveringUI ui, Item item)
         {
-            // 修改物体实例
-            SetupItem(item);
-
-            // 修改预制体
-            if (ModifiedPrefabIDs.Contains(item.TypeID)) return;
-            SetupItem(ItemAssetsCollection.GetPrefab(item.TypeID));
-            ModifiedPrefabIDs.Add(item.TypeID);
+            if (item == null) return;
+            _itemModifier.ModifyItem(item);
         }
-
-        private static void OnFinishedLoadingScene(SceneLoadingContext obj)
+        
+        private void OnSetupMeta(ItemHoveringUI ui, ItemMetaData meta)
         {
-            // 修改击杀任务要求
-            ModifyQuests();
-            
+            _itemModifier.ModifyPrefab(meta.id);
         }
 
-        private static void ModifyQuests()
+        private void OnFinishedLoadingScene(SceneLoadingContext obj)
         {
-            foreach (var activeQuest in QuestManager.Instance.ActiveQuests)
-            {
-                SetQuest(activeQuest);
-            }
+            _questModifier.ModifyActiveQuests();
         }
+    }
 
-        private static void SetupItem(Item item)
-        {
-            if (item == null)
-                return;
-            
-            // 堆叠数 
-            if (item.Stackable && item.MaxStackCount < 999)
-            {
-                item.MaxStackCount = item.MaxStackCount < 99 ? 99 : 999;
-            }
-            // 耐久度 
-            item.DurabilityLoss = 0;
-            
-            // 重量 
-            SetValue(item,"weight",0);
-        }
+    /// <summary>
+    /// 修改器基类，包含反射缓存功能
+    /// </summary>
+    public abstract class BaseModifier
+    {
+        private readonly Dictionary<Tuple<Type, string>, FieldInfo> _fieldCache = 
+            new Dictionary<Tuple<Type, string>, FieldInfo>();
 
-        private static void SetQuest(Quest quest)
-        {
-            foreach (var task in quest.Tasks.OfType<QuestTask_KillCount>())
-            {
-                SetValue(task,"requireBuff",false);
-                SetValue(task,"withWeapon", false);
-                SetValue(task,"requireHeadShot", false);
-                SetValue(task,"withoutHeadShot", false);
-                SetValue(task,"requireSceneID", "");
-            }
-        }
-
-        // 3. 优化后的 SetValue
-        private static void SetValue(object obj, string field, object value)
+        protected void SetValue(object obj, string fieldName, object value)
         {
             if (obj == null) return;
 
-            var key = Tuple.Create(obj.GetType(), field);
+            var key = Tuple.Create(obj.GetType(), fieldName);
 
-            // 尝试从缓存获取
-            if (!FieldCache.TryGetValue(key, out var fieldInfo))
+            if (!_fieldCache.TryGetValue(key, out var fieldInfo))
             {
-                // 如果缓存中没有，执行反射查找
                 fieldInfo = key.Item1.GetField(key.Item2, BindingFlags.NonPublic | BindingFlags.Instance);
-                // 存入缓存
-                FieldCache[key] = fieldInfo;
+                if (fieldInfo == null) return;
+                _fieldCache[key] = fieldInfo;
             }
 
-            // 使用缓存的 FieldInfo 设置值
-            fieldInfo?.SetValue(obj, value);
+            fieldInfo.SetValue(obj, value);
+        }
+
+        public void ClearCache()
+        {
+            _fieldCache.Clear();
+        }
+    }
+
+    /// <summary>
+    /// 物品修改器
+    /// </summary>
+    public class ItemModifier : BaseModifier
+    {
+        private readonly HashSet<int> _modifiedPrefabIDs = new HashSet<int>();
+
+        public void ModifyItem(Item item)
+        {
+            SetupItem(item);
+            ModifyPrefab(item.TypeID);
+        }
+
+        public void ModifyPrefab(int typeID)
+        {
+            if (_modifiedPrefabIDs.Contains(typeID)) return;
+            
+            var prefab = ItemAssetsCollection.GetPrefab(typeID);
+            if (prefab == null) return;
+            SetupItem(prefab);
+            _modifiedPrefabIDs.Add(typeID);
+        }
+
+        private void SetupItem(Item item)
+        {
+            // 耐久
+            item.DurabilityLoss = 0;
+            // 堆叠数
+            if (item.Stackable && item.MaxStackCount < 999) item.MaxStackCount = item.MaxStackCount < 99 ? 99 : 999;
+            // 重量
+            if (item.UnitSelfWeight != 0) SetValue(item, "weight", 0f);
+        }
+    }
+
+    /// <summary>
+    /// 任务修改器
+    /// </summary>
+    public class QuestModifier : BaseModifier
+    {
+        public void ModifyActiveQuests()
+        {
+            if (QuestManager.Instance == null) return;
+            
+            var activeQuests = QuestManager.Instance.ActiveQuests;
+            if (activeQuests == null) return;
+
+            foreach (var quest in activeQuests)
+            {
+                ModifyQuest(quest);
+            }
+        }
+
+        private void ModifyQuest(Quest quest)
+        {
+            if (quest.Tasks == null) return;
+            
+            var killTasks = quest.Tasks.OfType<QuestTask_KillCount>();
+            foreach (var task in killTasks)
+            {
+                ModifyQuestKillTask(task);
+            }
+        }
+
+        private void ModifyQuestKillTask(QuestTask_KillCount task)
+        {
+            SetValue(task, "requireBuff", false);
+            SetValue(task, "withWeapon", false);
+            SetValue(task, "requireHeadShot", false);
+            SetValue(task, "withoutHeadShot", false);
+            SetValue(task, "requireSceneID", string.Empty);
         }
     }
 }
