@@ -6,7 +6,7 @@ namespace BetterExperience.Modules
     /// <summary>
     /// 任务限制条件模块
     /// </summary>
-    public class Quest : ModuleBase
+    public class QuestModifier : ModuleBase
     {
         private readonly Modifier _modifier = new Modifier();
         private static readonly string EmptyString = string.Empty;
@@ -36,7 +36,7 @@ namespace BetterExperience.Modules
             }
         }
 
-        private void ModifyQuest(Duckov.Quests.Quest quest)
+        private void ModifyQuest(Quest quest)
         {
             if (quest.Tasks == null) return;
 

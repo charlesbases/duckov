@@ -70,13 +70,12 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="ModBehaviour.cs" />
-        <Compile Include="Modules\ItemDurability.cs" />
-        <Compile Include="Modules\ItemStack.cs" />
-        <Compile Include="Modules\ItemWeight.cs" />
+        <Compile Include="Modules\ItemModifier.cs" />
+        <Compile Include="Modules\LevelModifier.cs" />
         <Compile Include="Modules\ModuleBase.cs" />
         <Compile Include="Modules\Modifier.cs" />
-        <Compile Include="Modules\Quest.cs" />
-        <Compile Include="Modules\StockShopRefresh.cs" />
+        <Compile Include="Modules\QuestModifier.cs" />
+        <Compile Include="Modules\ShopModifier.cs" />
         <Compile Include="Properties\AssemblyInfo.cs"/>
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>

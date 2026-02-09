@@ -6,7 +6,7 @@ namespace BetterExperience.Modules
     /// <summary>
     /// 商店自动补货模块
     /// </summary>
-    public class StockShopRefresh : ModuleBase
+    public class ShopModifier : ModuleBase
     {
         public override void Enable()
         {

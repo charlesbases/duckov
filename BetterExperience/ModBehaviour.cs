@@ -34,13 +34,13 @@ namespace BetterExperience
         /// </summary>
         private void RegisterModules()
         {
-            _modules.Add(new ItemStack());
-            _modules.Add(new ItemWeight());
-            _modules.Add(new ItemDurability());
+            _modules.Add(new ItemModifier());
 
-            _modules.Add(new StockShopRefresh());
+            _modules.Add(new ShopModifier());
             
-            _modules.Add(new Quest());
+            _modules.Add(new QuestModifier());
+            
+            _modules.Add(new LevelModifier());
         }
     }
 }
